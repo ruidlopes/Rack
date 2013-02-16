@@ -151,6 +151,7 @@ rack.Rack.load = function(unit) {
 rack.Unit.fromScript = function(unitScriptLocation) {
   var script = document.createElement('script');
   script.src = unitScriptLocation;
+  document.body.appendChild(script);
 };
 
 rack.Unit.fromFunction = function(unitConstructor) {
