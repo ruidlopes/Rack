@@ -244,7 +244,7 @@ rack.Knob.prototype.getValue = function() {
 
 rack.Knob.prototype.setValue = function(newValue) {
   this.value = lib.math.clamp(newValue, 0.0, 1.0);
-  this.unit.onKnobValueChanged(this, newValue);
+  this.unit.onKnobValueChanged(this, this.value);
 };
 
 rack.Knob.prototype.render = function() {
@@ -401,18 +401,29 @@ rack.units.Input = function(rackInstance) {
       {video: false, audio: true},
       this.success.bind(this),
       this.error.bind(this));
-  this.knobs.push(new rack.Knob(this, 'gain', -100, 50));
+
+  this.gainNode = this.rack.context.createGain();
+  this.knobs.push(new rack.Knob(this, 'pre gain', -100, 50));
 };
 lib.inherits(rack.units.Input, rack.Unit);
 
 rack.units.Input.prototype.success = function(stream) {
-  this.output = this.rack.context.createMediaStreamSource(stream);
+  var mediaSource = this.rack.context.createMediaStreamSource(stream);
+  this.gainNode.gain.value = 0;
+  mediaSource.connect(this.gainNode);
+  this.output = this.gainNode;
   this.rack.setReady(true);
 };
 
 rack.units.Input.prototype.error = function() {
   this.rack.setReady(false);
   lib.error('no input connected');
+};
+
+rack.units.Input.prototype.onKnobValueChanged = function(knob, newValue) {
+  // knob is always gain.
+  rack.Unit.prototype.onKnobValueChanged.call(this, knob, newValue);
+  this.gainNode.gain.value = newValue * 10.0;
 };
 
 rack.units.Input.prototype.renderComponents = function() {
@@ -424,14 +435,23 @@ rack.units.Input.prototype.renderComponents = function() {
 namespace('rack.units.Output');
 rack.units.Output = function(rackInstance) {
   rack.Unit.call(this, rackInstance);
-  this.input = this.rack.context.destination;
-  this.knobs.push(new rack.Knob(this, 'gain', -100, 50));
+  this.gainNode = this.rack.context.createGain();
+  this.gainNode.gain.value = 0;
+  this.input = this.gainNode;
+  this.gainNode.connect(this.rack.context.destination);
+  this.knobs.push(new rack.Knob(this, 'post gain', -100, 50));
 };
 lib.inherits(rack.units.Output, rack.Unit);
 
 rack.units.Output.prototype.renderComponents = function() {
   this.renderPlate('#555', '#777', 'Output', '18,18,18');
   rack.Unit.prototype.renderComponents.call(this);
+};
+
+rack.units.Output.prototype.onKnobValueChanged = function(knob, newValue) {
+  // knob is always gain.
+  rack.Unit.prototype.onKnobValueChanged.call(this, knob, newValue);
+  this.gainNode.gain.value = newValue * 10.0;
 };
 
 
