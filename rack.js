@@ -575,8 +575,10 @@ rack.Matrix.prototype.render = function() {
   var realX = this.x > 0 ? this.x : (this.canvas.width + this.x - realW); 
   var realY = this.y > 0 ? this.y : (this.canvas.height + this.y - realH);
 
+  this.paint.fillStyle = 'rgba(0,0,0,0.4)';
+  this.paint.fillRect(realX - 1, realY - 1, realW + 3, realH + 3);
   this.paint.fillStyle = this.color;
-  this.paint.fillRect(realX, realY, realW, realH);
+  this.paint.fillRect(realX, realY, realW + 1, realH + 1);
   for (var i = 0, tx = 0, ty = 0; i < this.width * this.height; ++i) {
     if (tx == this.width) {
       tx = 0;
