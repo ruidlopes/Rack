@@ -5,11 +5,13 @@ Rack.js - extendable WebAudio guitar effects rack.
 
 ![Rack.js](https://raw.github.com/ruidlopes/Rack/master/rack.png)
 
+[Check out the demo (served from head, bugs shall be present!)](http://htmlpreview.github.com/?https://raw.github.com/ruidlopes/Rack/master/index.html)
+
 ## Set up
 1. A recent version of Chrome;
 2. Activate Web Audio Input in `chrome://flags`;
 3. Restart the browser;
-4. Serve these files from a web server (e.g., `python -m SimpleHttpServer`);
+4. Serve these files from a web server (e.g., `python -m SimpleHttpServer`).
 
 ## Play
 0. Load index.html and accept microphone access;
