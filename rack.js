@@ -111,10 +111,12 @@ rack.Rack = function() {
   this.context = null;
   this.units = [];
   this.registeredUnits = {};
+  this.registeredUnitsCount = 0;
 
   this.canvas = document.getElementById('rack-canvas');
   this.paint = this.canvas.getContext('2d');
 
+  this.menu = new rack.Menu(this);
   this.ready = false;
 };
 
@@ -173,6 +175,23 @@ rack.Rack.prototype.getPositionForUnit = function(unit) {
 
 rack.Rack.prototype.registerUnit = function(unit, name) {
   this.registeredUnits[name] = unit;
+  this.registeredUnitsCount++;
+};
+
+rack.Rack.prototype.getRegisteredUnitNameFromIndex = function(index) {
+  var keys = Object.keys(this.registeredUnits);
+  return keys[index];
+};
+
+rack.Rack.prototype.addUnitFromRegisterName = function(name) {
+  var unit = this.registeredUnits[name];
+  var instance = new unit(this);
+  this.addUnit(instance);
+};
+
+rack.Rack.prototype.addUnitFromRegisterIndex = function(index) {
+  var unitName = this.getRegisteredUnitNameFromIndex(index);
+  this.addUnitFromRegisterName(unitName);
 };
 
 rack.Rack.prototype.rewire = function() {
@@ -212,10 +231,6 @@ rack.Rack.prototype.renderStructure = function() {
   this.paint.restore();
 };
 
-rack.Rack.prototype.audio = function() {
-  return this.context;
-};
-
 rack.Rack.prototype.translateUnitEventY = function(event, unit) {
   return event.clientY - this.getPositionForUnit(unit) * rack.Unit.UNIT_HEIGHT - rack.Unit.UNIT_SPACING;
 };
@@ -234,6 +249,81 @@ rack.Rack.prototype.handleEvent = function(event) {
       return;
     }
   }
+};
+
+rack.Rack.prototype.handleKeyEvent = function(event) {
+  this.menu.handleKeyEvent(event);
+};
+
+
+// Rack menu.
+namespace('rack.Menu');
+rack.Menu = function(rackInstance) {
+  this.rack = rackInstance;
+  this.canvas = this.rack.canvas;
+  this.paint = this.rack.paint;
+  this.showing = false;
+  this.unitIndex = 0;
+};
+
+rack.Menu.prototype.handleKeyEvent = function(event) {
+  switch (event.keyCode) {
+    case 85:
+    case 117:
+      this.handleMenu();
+      this.render();
+      break;
+    case 13:
+      this.handleSelect();
+      this.render();
+      break;
+    case 27:
+      this.handleExit();
+      this.render();
+      break;
+  }
+};
+
+rack.Menu.prototype.handleMenu = function() {
+  if (!this.showing) {
+    this.showing = true;
+  } else {
+    this.unitIndex = (this.unitIndex + 1) % this.rack.registeredUnitsCount;
+  }
+};
+
+rack.Menu.prototype.handleSelect = function() {
+  this.rack.addUnitFromRegisterIndex(this.unitIndex);
+  this.handleExit();
+};
+
+rack.Menu.prototype.handleExit = function() {
+  this.unitIndex = 0;
+  this.showing = false;
+};
+
+rack.Menu.prototype.render = function() {
+  this.rack.render(true);
+  if (!this.showing) {
+    return;
+  }
+  this.paint.transform(0, 0);
+  var size = 100;
+  var xc = this.canvas.width / 2;
+  var yc = this.canvas.height / 2;
+  var x = xc - size;
+  var y = yc - size;
+
+  this.paint.fillStyle = 'rgba(0,0,0,0.8)';
+  lib.paint.roundedRectangle(this.paint, x, y, size*2, size*2, 5);
+  this.paint.fill();
+
+  this.paint.fillStyle = 'rgba(255,255,255,0.5)';
+  lib.paint.roundedRectangle(this.paint, x + 3, y + 3, size*2 - 6, size*2 - 6, 5);
+  this.paint.fill();
+
+  var text = this.rack.getRegisteredUnitNameFromIndex(this.unitIndex);
+  lib.paint.text(this.paint, text, xc, yc, '#fff', 'bold 20pt Helvetica', 'center');
 };
 
 
@@ -600,3 +690,4 @@ window.addEventListener('click', rack.bind('handleEvent'));
 window.addEventListener('mousedown', rack.bind('handleEvent'));
 window.addEventListener('mousemove', rack.bind('handleEvent'));
 window.addEventListener('mouseup', rack.bind('handleEvent'));
+window.addEventListener('keydown', rack.bind('handleKeyEvent'));
