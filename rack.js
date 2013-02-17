@@ -38,6 +38,11 @@ lib.functions.RACK1U = lib.functions.constant(1);
 lib.functions.RACK2U = lib.functions.constant(2);
 lib.functions.RACK3U = lib.functions.constant(3);
 
+namespace('lib.math');
+lib.math.clamp = function(value, min, max) {
+  return Math.max(Math.min(value, max), min);
+};
+
 namespace('lib.paint');
 lib.paint.roundedRectangle = function(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -74,11 +79,9 @@ lib.paint.screw = function(ctx, x, y) {
   ctx.restore();
 };
 lib.paint.text = function(ctx, text, x, y, color, font) {
-  ctx.save();
   ctx.fillStyle = color;
   ctx.font = font;
   ctx.fillText(text, x, y);
-  ctx.restore();
 };
 lib.paint.line = function(ctx, x1, y1, x2, y2, c) {
   ctx.beginPath();
@@ -149,6 +152,10 @@ rack.Rack.prototype.moveUnit = function(from, to) {
   this.rewire();
 };
 
+rack.Rack.prototype.getPositionForUnit = function(unit) {
+  return this.units.indexOf(unit);
+};
+
 rack.Rack.prototype.rewire = function() {
   for (var i = 0; i < this.units.length - 1; ++i) {
     var unit = this.units[i];
@@ -168,16 +175,17 @@ rack.Rack.prototype.resize = function() {
 };
 
 rack.Rack.prototype.render = function() {
+  this.paint.fillStyle = '#000';
+  this.paint.fillRect(0, 0, this.canvas.width, this.canvas.height);
   this.renderStructure();
   for (var i = 0; i < this.units.length; ++i) {
-    this.paint.translate(0, /** spacing */5 + i * rack.Unit.UNIT_SIZE);
     this.units[i].render();
   }
 };
 
 rack.Rack.prototype.renderStructure = function() {
-  this.paint.translate(0, 0);
   this.paint.save();
+  this.paint.translate(0, 0);
   var w = 30;
   this.paint.fillStyle = '#444';
   this.paint.fillRect(0, 0, w, this.canvas.height);
@@ -189,27 +197,138 @@ rack.Rack.prototype.audio = function() {
   return this.context;
 };
 
+rack.Rack.prototype.translateUnitEventY = function(event, unitIndex) {
+  return event.clientY - unitIndex * rack.Unit.UNIT_HEIGHT - rack.Unit.UNIT_SPACING;
+};
+
+rack.Rack.prototype.isUnitEventYWithinBounds = function(y) {
+  return y >= 0 && y < rack.Unit.UNIT_SIZE;
+};
+
+rack.Rack.prototype.handleEvent = function(event) {
+  for (var i = 0; i < this.units.length; ++i) {
+    var unit = this.units[i];
+    var x = event.clientX;
+    var y = this.translateUnitEventY(event, i);
+    if (this.isUnitEventYWithinBounds(y) && unit.willHandleEvent(event, x, y)) {
+      unit.handleEvent(event, x, y);
+      return;
+    }
+  }
+};
+
+
+// Rack unit knob.
+namespace('rack.Knob');
+rack.Knob = function(unitInstance, name, x, y, opt_color, opt_highlight) {
+  this.unit = unitInstance;
+  this.canvas = unitInstance.canvas;
+  this.paint = unitInstance.paint;
+  this.name = name;
+  this.value = 0;
+  this.color = opt_color || 'rgba(0,0,0,0.75)';
+  this.highlight = opt_highlight || 'rgba(127,127,127,0.75)';
+  this.x = x;
+  this.y = y;
+
+  this.isHandlingMouseDown = false;
+  this.valueAtMouseDown = 0;
+  this.mouseDownY = 0;
+};
+
+rack.Knob.RADIUS = 30;
+
+rack.Knob.prototype.getValue = function() {
+  return this.value;
+};
+
+rack.Knob.prototype.setValue = function(newValue) {
+  this.value = lib.math.clamp(newValue, 0.0, 1.0);
+  this.unit.onKnobValueChanged(this, newValue);
+};
+
+rack.Knob.prototype.render = function() {
+  var realX = this.x > 0 ? this.x : this.canvas.width + this.x; 
+  var realY = this.y > 0 ? this.y : this.canvas.height + this.y;
+  var angle = Math.PI * 0.75 + this.value * Math.PI * 1.5;
+  var angleX = realX + 20 * Math.cos(angle);
+  var angleY = realY + 20 * Math.sin(angle);
+  var gradient = this.paint.createRadialGradient(realX, realY, 30, angleX, angleY, 2);
+  gradient.addColorStop(0, this.color);
+  gradient.addColorStop(0.15, this.color);
+  gradient.addColorStop(0.9, this.highlight);
+  gradient.addColorStop(1, this.color);
+  lib.paint.circle(this.paint, realX, realY, rack.Knob.RADIUS, gradient);
+};
+
+rack.Knob.prototype.willHandleEvent = function(event, x, y) {
+  var realX = this.x > 0 ? this.x : this.canvas.width + this.x; 
+  var realY = this.y > 0 ? this.y : this.canvas.height + this.y;
+  var xx = Math.pow(realX - x, 2);
+  var yy = Math.pow(realY - y, 2);
+  return (event.type == 'mousedown' && Math.sqrt(xx + yy) <= rack.Knob.RADIUS) ||
+      (event.type == 'mousemove' && this.isHandlingMouseDown) ||
+      (event.type == 'mouseup' && this.isHandlingMouseDown);
+};
+
+rack.Knob.prototype.handleEvent = function(event, x, y) {
+  switch (event.type) {
+    case 'mousedown':
+      this.isHandlingMouseDown = true;
+      this.valueAtMouseDown = this.value;
+      this.mouseDownY = y;
+      break;
+    case 'mousemove':
+      var value = this.valueAtMouseDown + (this.mouseDownY - y) / 40;
+      this.setValue(value);
+      break;
+    case 'mouseup':
+      this.isHandlingMouseDown = false;
+      this.unit.onKnobDone();
+      break;
+    default:
+      break;
+  }
+};
+
 
 // Rack units.
 namespace('rack.Unit');
-
 rack.Unit = function(rackInstance) {
   this.rack = rackInstance;
   this.canvas = rackInstance.canvas;
   this.paint = rackInstance.paint;
   this.input = null;
   this.output = null;
+  this.knobs = [];
+
+  this.knobHandlingEvent = null;
 };
 
+rack.Unit.UNIT_SPACING = 5;
 rack.Unit.UNIT_SIZE = 100;
+rack.Unit.UNIT_HEIGHT = rack.Unit.UNIT_SPACING + rack.Unit.UNIT_SIZE;
 
 rack.Unit.prototype.size = lib.functions.RACK1U;
 
-rack.Unit.prototype.render = lib.functions.EMPTY;
+rack.Unit.prototype.getPosition = function() {
+  return this.rack.getPositionForUnit(this);
+};
+
+rack.Unit.prototype.render = function() {
+  this.paint.save();
+  this.paint.translate(0, this.getPosition() * rack.Unit.UNIT_HEIGHT);
+  this.renderComponents();
+  this.paint.restore();
+};
+
+rack.Unit.prototype.renderComponents = function() {
+  for (var i = 0; i < this.knobs.length; ++i) {
+    this.knobs[i].render();
+  }
+};
 
 rack.Unit.prototype.renderPlate = function(color, highlight, title, opt_titleColor) {
-  this.paint.save();
-
   var w = this.canvas.width - 7;
   var h = rack.Unit.UNIT_SIZE * this.size();
   this.paint.fillStyle = 'rgba(0, 0, 0, 0.3)';
@@ -236,16 +355,32 @@ rack.Unit.prototype.renderPlate = function(color, highlight, title, opt_titleCol
   var colorStub = 'rgba(' + (opt_titleColor || '0,0,0');
   lib.paint.text(this.paint, title, 40, 25, colorStub + ',0.55)', 'italic 17pt Georgia');
   lib.paint.text(this.paint, title, 42, 25, colorStub + ',0.25)', 'italic 17pt Georgia');
-
-  this.paint.restore();
 };
 
-rack.Rack.load = function(unit) {
-  if (lib.isString(unit)) {
-    rack.Unit.fromScript(unit);
-  } else if (lib.isFunction(unit)) {
-    racl.Unit.fromFunction(unit);
+rack.Unit.prototype.willHandleEvent = function(event, x, y) {
+  for (var i = 0; i < this.knobs.length; ++i) {
+    var knob = this.knobs[i];
+    if (knob.willHandleEvent(event, x, y)) {
+      this.knobHandlingEvent = knob;
+      return true;
+    }
   }
+  this.knobHandlingEvent = null;
+  return false;
+};
+
+rack.Unit.prototype.handleEvent = function(event, x, y) {
+  if (this.knobHandlingEvent) {
+    this.knobHandlingEvent.handleEvent(event, x, y);
+  }
+};
+
+rack.Unit.prototype.onKnobValueChanged = function(knob, value) {
+  this.render();
+};
+
+rack.Unit.prototype.onKnobDone = function() {
+  this.knobHandlingEvent = null;
 };
 
 rack.Unit.fromScript = function(unitScriptLocation) {
@@ -266,6 +401,7 @@ rack.units.Input = function(rackInstance) {
       {video: false, audio: true},
       this.success.bind(this),
       this.error.bind(this));
+  this.knobs.push(new rack.Knob(this, 'gain', -100, 50));
 };
 lib.inherits(rack.units.Input, rack.Unit);
 
@@ -279,19 +415,23 @@ rack.units.Input.prototype.error = function() {
   lib.error('no input connected');
 };
 
-rack.units.Input.prototype.render = function() {
+rack.units.Input.prototype.renderComponents = function() {
   this.renderPlate('#eee', '#fff', 'Input', '164,164,164');
+  rack.Unit.prototype.renderComponents.call(this);
 };
+
 
 namespace('rack.units.Output');
 rack.units.Output = function(rackInstance) {
   rack.Unit.call(this, rackInstance);
   this.input = this.rack.context.destination;
+  this.knobs.push(new rack.Knob(this, 'gain', -100, 50));
 };
 lib.inherits(rack.units.Output, rack.Unit);
 
-rack.units.Output.prototype.render = function() {
+rack.units.Output.prototype.renderComponents = function() {
   this.renderPlate('#555', '#777', 'Output', '18,18,18');
+  rack.Unit.prototype.renderComponents.call(this);
 };
 
 
@@ -311,3 +451,8 @@ rack.load = function(unit) {
 window.addEventListener('load', rack.bind('init'));
 window.addEventListener('unload', rack.bind('dispose'));
 window.addEventListener('resize', rack.bind('resize'));
+
+window.addEventListener('click', rack.bind('handleEvent'));
+window.addEventListener('mousedown', rack.bind('handleEvent'));
+window.addEventListener('mousemove', rack.bind('handleEvent'));
+window.addEventListener('mouseup', rack.bind('handleEvent'));
