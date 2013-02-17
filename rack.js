@@ -38,6 +38,16 @@ lib.functions.RACK1U = lib.functions.constant(1);
 lib.functions.RACK2U = lib.functions.constant(2);
 lib.functions.RACK3U = lib.functions.constant(3);
 
+lib.functions.binary = function(str8) {
+  var num = 0;
+  for (var i = 0; i < 8; ++i) {
+    if (str8[i] == '1') {
+      num += 1 << (7 - i);
+    }
+  }
+  return num;
+};
+
 namespace('lib.math');
 lib.math.clamp = function(value, min, max) {
   return Math.max(Math.min(value, max), min);
@@ -93,7 +103,6 @@ lib.paint.line = function(ctx, x1, y1, x2, y2, c) {
   ctx.strokeStyle = c;
   ctx.stroke();
 };
-
 
 namespace('rack');
 namespace('rack.Rack');
@@ -403,6 +412,106 @@ rack.Unit.fromScript = function(unitScriptLocation) {
 rack.Unit.fromFunction = function(unitConstructor, name) {
   rack.get().registerUnit(unitConstructor, name);
 };
+
+
+namespace('rack.Matrix');
+rack.Matrix = function(canvas, paint, x, y, width, height, color, midColor, textColor) {
+  this.canvas = canvas;
+  this.paint = paint;
+  this.x = x;
+  this.y = y;
+  this.width = width;
+  this.height = height;
+  this.color = color;
+  this.midColor = midColor;
+  this.textColor = textColor;
+  this.text = '';
+};
+
+rack.Matrix.CHAR_SIZE = 8;
+rack.Matrix.PIXEL_SIZE = 2;
+
+rack.Matrix.chars = {
+  '0': [126, 129, 129, 129, 129, 129, 129, 126],
+  '1': [16, 48, 80, 16, 16, 16, 16, 254],
+  '2': [126, 129, 1, 126, 128, 128, 128, 255],
+  '3': [255, 1, 1, 14, 1, 1, 129, 126],
+  '4': [129, 129, 129, 255, 1, 1, 1, 1],
+  '5': [255, 128, 128, 254, 1, 1, 129, 126],
+  '6': [62, 64, 128, 254, 129, 129, 129, 126],
+  '7': [255, 1, 2, 4, 8, 8, 8, 8],
+  '8': [126, 129, 129, 126, 129, 129, 129, 126],
+  '9': [126, 129, 129, 127, 1, 1, 2, 124],
+  ' ': [0, 0, 0, 0, 0, 0, 0, 0],
+  'A': [126, 129, 129, 255, 129, 129, 129, 129],
+  'B': [254, 129, 129, 254, 129, 129, 129, 254],
+  'C': [126, 129, 128, 128, 128, 128, 129, 126],
+  'D': [254, 129, 129, 129, 129, 129, 129, 254],
+  'E': [255, 128, 128, 252, 128, 128, 128, 255],
+  'F': [255, 128, 128, 252, 128, 128, 128, 128],
+  'G': [126, 129, 128, 143, 129, 129, 129, 126],
+  'H': [129, 129, 129, 255, 129, 129, 129, 129],
+  'I': [124, 16, 16, 16, 16, 16, 16, 124],
+  'J': [1, 1, 1, 1, 1, 1, 129, 126],
+  'K': [129, 129, 130, 252, 130, 129, 129, 129],
+  'L': [128, 128, 128, 128, 128, 128, 128, 255],
+  'M': [129, 195, 165, 153, 129, 129, 129, 129],
+  'N': [129, 193, 161, 145, 137, 133, 131, 129],
+  'O': [126, 129, 129, 129, 129, 129, 129, 126],
+  'P': [254, 129, 129, 254, 128, 128, 128, 128],
+  'Q': [126, 129, 129, 129, 137, 133, 131, 127],
+  'R': [254, 129, 129, 254, 129, 129, 129, 129],
+  'S': [126, 129, 128, 126, 1, 1, 129, 126],
+  'T': [255, 16, 16, 16, 16, 16, 16, 16],
+  'U': [129, 129, 129, 129, 129, 129, 129, 126],
+  'V': [129, 129, 66, 66, 36, 36, 24, 24],
+  'W': [129, 129, 129, 66, 66, 90, 36, 36],
+  'X': [129, 66, 36, 24, 24, 36, 66, 129],
+  'Y': [129, 129, 129, 127, 1, 1, 129, 126],
+  'Z': [255, 2, 4, 8, 16, 32, 64, 255],
+  '.': [0, 0, 0, 0, 0, 0, 24, 24],
+  '/': [1, 2, 4, 8, 16, 32, 64, 128]
+};
+
+rack.Matrix.prototype.setText = function(text) {
+  this.text = String(text || '').toUpperCase();
+};
+
+rack.Matrix.prototype.render = function() {
+  var realC = rack.Matrix.CHAR_SIZE * rack.Matrix.PIXEL_SIZE + 1;
+  var realW = this.width * realC;
+  var realH = this.height * realC; 
+  var realX = this.x > 0 ? this.x : (this.canvas.width + this.x - realW); 
+  var realY = this.y > 0 ? this.y : (this.canvas.height + this.y - realH);
+
+  this.paint.fillStyle = this.color;
+  this.paint.fillRect(realX, realY, realW, realH);
+  for (var i = 0, tx = 0, ty = 0; i < this.width * this.height; ++i) {
+    if (tx == this.width) {
+      tx = 0;
+      ty++;
+    }
+    if (ty == this.height) {
+      break;
+    }
+    var txx = realX + tx * realC;
+    var tyy = realY + ty * realC;
+    var ch = rack.Matrix.chars[this.text[i]] || rack.Matrix.chars[' '];
+    for (var yy = 0; yy < rack.Matrix.CHAR_SIZE; ++yy) {
+      var line = ch[yy];
+      for (var xx = 0; xx < rack.Matrix.CHAR_SIZE; ++xx) {
+        var pixel = line & (128 >> (xx));
+        this.paint.fillStyle = pixel ? this.textColor : this.midColor;
+        this.paint.fillRect(txx + (xx * rack.Matrix.PIXEL_SIZE + 1),
+                            tyy + (yy * rack.Matrix.PIXEL_SIZE + 1),
+                            rack.Matrix.PIXEL_SIZE,
+                            rack.Matrix.PIXEL_SIZE); 
+      }
+    }
+    tx++;
+  }
+};
+
 
 
 namespace('rack.units.Input');

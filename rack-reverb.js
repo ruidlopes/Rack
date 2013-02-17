@@ -9,6 +9,7 @@ rack.reverb.Reverb = function(rackInstance) {
   this.impulses = {};
   this.impulsesToLoad = 0;
   this.loadAllImpulses();
+  this.matrix = new rack.Matrix(this.canvas, this.paint, -50, 50, 15, 3, '#dd0', '#bb0', '#660');
 
   this.input = this.rack.context.createGain();
   this.output = this.rack.context.createGain();
@@ -16,6 +17,7 @@ rack.reverb.Reverb = function(rackInstance) {
   this.output.gain.value = 1.0;
 
   this.convolverNode = this.rack.context.createConvolver();
+  this.knobs.push(new rack.Knob(this, 'hall type', -400, 80, '#000', '#333'));
 };
 lib.inherits(rack.reverb.Reverb, rack.Unit);
 
@@ -34,9 +36,11 @@ rack.reverb.Reverb.prototype.loadAllImpulses = function() {
 
 rack.reverb.Reverb.prototype.impulseLoadCallback = function() {
   this.impulsesToLoad--;
+  var impulsesLoaded = rack.reverb.Impulse.NUM_DESCRIPTORS - this.impulsesToLoad;
+  this.matrix.setText('loading ' + impulsesLoaded + '/' + rack.reverb.Impulse.NUM_DESCRIPTORS + '...');
+  this.render();
   if (this.impulsesToLoad == 0) {
     // loaded.
-    console.log('impulses loaded');
     this.selectImpulse(0);
     this.input.connect(this.convolverNode);
     this.convolverNode.connect(this.output);
@@ -47,12 +51,22 @@ rack.reverb.Reverb.prototype.selectImpulse = function(index) {
   var keys = Object.keys(this.impulses);
   var impulseName = keys[index];
   this.convolverNode.buffer = this.impulses[impulseName].buffer;
+  this.matrix.setText(impulseName);
+  this.render();
 };
 
 rack.reverb.Reverb.prototype.renderComponents = function() {
   this.renderPlate('#c00', '#d33', 'Reverb', '33,33,33');
+  this.matrix.render();
   rack.Unit.prototype.renderComponents.call(this);
 };
+
+rack.reverb.Reverb.prototype.onKnobValueChanged = function(knob, newValue) {
+  // knob is always impulse selector.
+  var selectedIndex = Math.round(newValue * (rack.reverb.Impulse.NUM_DESCRIPTORS - 1));
+  this.selectImpulse(selectedIndex);
+};
+
 
 namespace('rack.reverb.Impulse');
 rack.reverb.Impulse = function(name, filename) {
@@ -123,6 +137,8 @@ rack.reverb.Impulse.descriptors = {
   'trig room': 'Trig Room.wav',
   'vocal duo': 'Vocal Duo.wav'
 };
+
+rack.reverb.Impulse.NUM_DESCRIPTORS = Object.keys(rack.reverb.Impulse.descriptors).length;
 
 rack.reverb.Impulse.createFromDescriptor = function(name) {
   var filename = rack.reverb.Impulse.descriptors[name];
