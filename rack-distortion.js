@@ -21,7 +21,7 @@ lib.inherits(rack.Distortion, rack.Unit);
 rack.Distortion.SAMPLES = 2048;
 
 rack.Distortion.prototype.computeCurve = function() {
-  var a = Math.sin(this.distortion * Math.PI * 0.5);
+  a = this.distortion;
   var k = 2 * a / (1 - a);
   for (var i = 0; i < rack.Distortion.SAMPLES; ++i) {
     var x = (i - 0) * (1 - (-1)) / (rack.Distortion.SAMPLES - 0) + (-1);

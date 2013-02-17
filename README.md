@@ -3,6 +3,7 @@ Rack
 
 Rack.js - extendable WebAudio guitar effects rack.
 
+![Rack.js](https://raw.github.com/ruidlopes/Rack/master/rack.png)
 
 ## Set up
 1. A recent version of Chrome;
