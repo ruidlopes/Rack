@@ -78,8 +78,9 @@ lib.paint.screw = function(ctx, x, y) {
   ctx.stroke();
   ctx.restore();
 };
-lib.paint.text = function(ctx, text, x, y, color, font) {
+lib.paint.text = function(ctx, text, x, y, color, font, opt_align) {
   ctx.fillStyle = color;
+  ctx.textAlign = opt_align || 'left';
   ctx.font = font;
   ctx.fillText(text, x, y);
 };
@@ -262,12 +263,13 @@ rack.Knob.prototype.render = function() {
   var angle = Math.PI * 0.75 + this.value * Math.PI * 1.5;
   var angleX = realX + 20 * Math.cos(angle);
   var angleY = realY + 20 * Math.sin(angle);
-  var gradient = this.paint.createRadialGradient(realX, realY, 30, angleX, angleY, 2);
+  var gradient = this.paint.createRadialGradient(realX, realY, rack.Knob.RADIUS, angleX, angleY, 2);
   gradient.addColorStop(0, this.color);
   gradient.addColorStop(0.15, this.color);
   gradient.addColorStop(0.9, this.highlight);
   gradient.addColorStop(1, this.color);
   lib.paint.circle(this.paint, realX, realY, rack.Knob.RADIUS, gradient);
+  lib.paint.text(this.paint, this.name.toUpperCase(), realX, realY + rack.Knob.RADIUS + 12, 'rgba(0,0,0,0.7)', 'bold 7pt Arial', 'center');
 };
 
 rack.Knob.prototype.willHandleEvent = function(event, x, y) {
@@ -315,7 +317,7 @@ rack.Unit = function(rackInstance) {
 };
 
 rack.Unit.UNIT_SPACING = 5;
-rack.Unit.UNIT_SIZE = 100;
+rack.Unit.UNIT_SIZE = 80;
 rack.Unit.UNIT_HEIGHT = rack.Unit.UNIT_SPACING + rack.Unit.UNIT_SIZE;
 
 rack.Unit.prototype.size = lib.functions.RACK1U;
@@ -326,7 +328,7 @@ rack.Unit.prototype.getPosition = function() {
 
 rack.Unit.prototype.render = function() {
   this.paint.save();
-  this.paint.translate(0, this.getPosition() * rack.Unit.UNIT_HEIGHT);
+  this.paint.translate(0, this.getPosition() * (rack.Unit.UNIT_SIZE + rack.Unit.UNIT_SPACING));
   this.renderComponents();
   this.paint.restore();
 };
@@ -412,7 +414,7 @@ rack.units.Input = function(rackInstance) {
       this.error.bind(this));
 
   this.gainNode = this.rack.context.createGain();
-  this.knobs.push(new rack.Knob(this, 'pre gain', -100, 50));
+  this.knobs.push(new rack.Knob(this, 'pre gain', -100, 35));
 };
 lib.inherits(rack.units.Input, rack.Unit);
 
@@ -448,7 +450,7 @@ rack.units.Output = function(rackInstance) {
   this.gainNode.gain.value = 0;
   this.input = this.gainNode;
   this.gainNode.connect(this.rack.context.destination);
-  this.knobs.push(new rack.Knob(this, 'post gain', -100, 50));
+  this.knobs.push(new rack.Knob(this, 'post gain', -100, 35));
 };
 lib.inherits(rack.units.Output, rack.Unit);
 
