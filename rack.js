@@ -100,6 +100,7 @@ namespace('rack.Rack');
 rack.Rack = function() {
   this.context = null;
   this.units = [];
+  this.registeredUnits = {};
 
   this.canvas = document.getElementById('rack-canvas');
   this.paint = this.canvas.getContext('2d');
@@ -153,7 +154,15 @@ rack.Rack.prototype.moveUnit = function(from, to) {
 };
 
 rack.Rack.prototype.getPositionForUnit = function(unit) {
-  return this.units.indexOf(unit);
+  var position = 0;
+  for (var i = 0; i < this.units.indexOf(unit); ++i) {
+    position += this.units[i].size();
+  }
+  return position;
+};
+
+rack.Rack.prototype.registerUnit = function(unit, name) {
+  this.registeredUnits[name] = unit;
 };
 
 rack.Rack.prototype.rewire = function() {
@@ -197,20 +206,20 @@ rack.Rack.prototype.audio = function() {
   return this.context;
 };
 
-rack.Rack.prototype.translateUnitEventY = function(event, unitIndex) {
-  return event.clientY - unitIndex * rack.Unit.UNIT_HEIGHT - rack.Unit.UNIT_SPACING;
+rack.Rack.prototype.translateUnitEventY = function(event, unit) {
+  return event.clientY - this.getPositionForUnit(unit) * rack.Unit.UNIT_HEIGHT - rack.Unit.UNIT_SPACING;
 };
 
-rack.Rack.prototype.isUnitEventYWithinBounds = function(y) {
-  return y >= 0 && y < rack.Unit.UNIT_SIZE;
+rack.Rack.prototype.isUnitEventYWithinBounds = function(unit, y) {
+  return y >= 0 && y < rack.Unit.UNIT_SIZE * unit.size();
 };
 
 rack.Rack.prototype.handleEvent = function(event) {
   for (var i = 0; i < this.units.length; ++i) {
     var unit = this.units[i];
     var x = event.clientX;
-    var y = this.translateUnitEventY(event, i);
-    if (this.isUnitEventYWithinBounds(y) && unit.willHandleEvent(event, x, y)) {
+    var y = this.translateUnitEventY(event, unit);
+    if (this.isUnitEventYWithinBounds(unit, y) && unit.willHandleEvent(event, x, y)) {
       unit.handleEvent(event, x, y);
       return;
     }
@@ -389,8 +398,8 @@ rack.Unit.fromScript = function(unitScriptLocation) {
   document.body.appendChild(script);
 };
 
-rack.Unit.fromFunction = function(unitConstructor) {
-  rack.get().addUnit(new unitConstructor(rack.get()));
+rack.Unit.fromFunction = function(unitConstructor, name) {
+  rack.get().registerUnit(unitConstructor, name);
 };
 
 
@@ -463,8 +472,12 @@ rack.get = function() {
 rack.bind = function(functionName) {
   return rack.instance[functionName].bind(rack.instance);
 };
-rack.load = function(unit) {
-  rack.Unit.fromFunction(unit);
+rack.load = function(unit, opt_name) {
+  if (lib.isString(unit)) {
+    rack.Unit.fromScript(unit);
+  } else if (lib.isFunction(unit)) {
+    rack.Unit.fromFunction(unit, opt_name);
+  }
 };
 
 // Global events.
