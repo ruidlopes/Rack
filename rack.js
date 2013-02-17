@@ -329,7 +329,7 @@ rack.Menu.prototype.render = function() {
 
 // Rack unit knob.
 namespace('rack.Knob');
-rack.Knob = function(unitInstance, name, x, y, opt_color, opt_highlight) {
+rack.Knob = function(unitInstance, name, x, y, opt_color, opt_highlight, opt_textColor) {
   this.unit = unitInstance;
   this.canvas = unitInstance.canvas;
   this.paint = unitInstance.paint;
@@ -337,6 +337,7 @@ rack.Knob = function(unitInstance, name, x, y, opt_color, opt_highlight) {
   this.value = 0;
   this.color = opt_color || 'rgba(0,0,0,0.75)';
   this.highlight = opt_highlight || 'rgba(127,127,127,0.75)';
+  this.textColor = opt_textColor || 'rgba(0,0,0,0.7)';
   this.x = x;
   this.y = y;
 
@@ -368,7 +369,7 @@ rack.Knob.prototype.render = function() {
   gradient.addColorStop(0.9, this.highlight);
   gradient.addColorStop(1, this.color);
   lib.paint.circle(this.paint, realX, realY, rack.Knob.RADIUS, gradient);
-  lib.paint.text(this.paint, this.name.toUpperCase(), realX, realY + rack.Knob.RADIUS + 12, 'rgba(0,0,0,0.7)', 'bold 7pt Arial', 'center');
+  lib.paint.text(this.paint, this.name.toUpperCase(), realX, realY + rack.Knob.RADIUS + 12, this.textColor, 'bold 7pt Arial', 'center');
 };
 
 rack.Knob.prototype.willHandleEvent = function(event, x, y) {

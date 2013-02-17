@@ -55,7 +55,7 @@ rack.delay.Delay.prototype.onKnobValueChanged = function(knob, newValue) {
 };
 
 rack.delay.Delay.prototype.renderComponents = function() {
-  this.renderPlate('#00c', '03f', 'Delay', '33,33,33');
+  this.renderPlate('#00c', '#03f', 'Delay', '33,33,33');
   rack.Unit.prototype.renderComponents.call(this);
 };
 
