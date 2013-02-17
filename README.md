@@ -14,7 +14,8 @@ Rack.js - extendable WebAudio guitar effects rack.
 0. Load index.html and accept microphone access;
 1. Move the knobs with the mouse;
 2. Hit 'U' to display menu and cycle through available effects;
-3. Hit 'Enter' to add the selected effect, or 'Esc' to dismiss.
+3. Hit 'Enter' to add the selected effect, or 'Esc' to dismiss;
+4. Hit 'D' to remove the last effect unit.
 
 Have fun!
 

@@ -156,6 +156,14 @@ rack.Rack.prototype.removeUnit = function(unit) {
   this.rewire();
 };
 
+rack.Rack.prototype.removeLastUnit = function() {
+  if (this.units.length == 2) {
+    // Do not delete input & output units.
+    return;
+  }
+  this.removeUnit(this.units[this.units.length - 2]);
+};
+
 rack.Rack.prototype.moveUnit = function(from, to) {
   if (from == to) {
     return;
@@ -252,7 +260,11 @@ rack.Rack.prototype.handleEvent = function(event) {
 };
 
 rack.Rack.prototype.handleKeyEvent = function(event) {
-  this.menu.handleKeyEvent(event);
+  if (event.keyCode == 68) {  // D.
+    this.removeLastUnit();
+  } else {
+    this.menu.handleKeyEvent(event);
+  }
 };
 
 
